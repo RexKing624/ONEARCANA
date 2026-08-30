@@ -342,7 +342,7 @@ const generateCard = () => {
   context.font = '18px system-ui, sans-serif'
   context.fillText('onearcana.xergnik.com', 104, 1240)
   context.textAlign = 'right'
-  context.fillText(`${t.value.canvasCreator} @Xer_Gnik`, 976, 1240)
+  context.fillText('@Xer_Gnik', 976, 1240)
   context.textAlign = 'start'
 
   canvas.toBlob((blob) => {
