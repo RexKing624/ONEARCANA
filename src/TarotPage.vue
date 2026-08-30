@@ -17,6 +17,7 @@ const selectedBack = ref(null)
 const isRevealed = ref(false)
 const cardImageLoaded = ref(false)
 const feedback = ref('')
+const sharePreview = ref(null)
 const activePointer = ref(null)
 const lastPoint = ref({ x: 0, y: 0 })
 const shuffleCards = ref([])
@@ -67,6 +68,7 @@ const orientationEn = computed(() => result.value?.isReversed ? 'Reversed' : 'Up
 const orientationLocal = computed(() => result.value?.isReversed ? t.value.reversed : t.value.upright)
 const dateLocale = computed(() => ({ zh: 'zh-CN', ja: 'ja-JP', en: 'en-CA' }[language.value]))
 const displayDate = computed(() => result.value?.date || new Intl.DateTimeFormat(dateLocale.value, { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()))
+const displayTime = computed(() => result.value?.time || new Intl.DateTimeFormat(dateLocale.value, { hour: '2-digit', minute: '2-digit' }).format(new Date()))
 
 watch(language, (value) => {
   localStorage.setItem('site-language', value)
@@ -198,11 +200,13 @@ const chooseCard = (index) => {
   selectedBack.value = index
   const card = tarotCards[secureRandomInt(tarotCards.length)]
   const isReversed = secureRandomInt(2) === 1
+  const drawnAt = new Date()
   result.value = {
     card,
     isReversed,
     question: question.value.trim(),
-    date: new Intl.DateTimeFormat(dateLocale.value, { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()),
+    date: new Intl.DateTimeFormat(dateLocale.value, { year: 'numeric', month: '2-digit', day: '2-digit' }).format(drawnAt),
+    time: new Intl.DateTimeFormat(dateLocale.value, { hour: '2-digit', minute: '2-digit' }).format(drawnAt),
   }
   stageTimer = window.setTimeout(() => {
     stage.value = 'reveal'
@@ -245,19 +249,20 @@ const copyForAI = async () => {
 }
 
 const wrapCanvasText = (context, text, x, y, maxWidth, lineHeight, maxLines = 4) => {
-  const characters = [...text]
+  const usesWords = /\s/.test(text.trim())
+  const units = usesWords ? text.trim().split(/\s+/) : [...text]
   let line = ''
   let lines = 0
-  characters.forEach((character, index) => {
-    const testLine = line + character
+  units.forEach((unit, index) => {
+    const testLine = line ? `${line}${usesWords ? ' ' : ''}${unit}` : unit
     if (context.measureText(testLine).width > maxWidth && line && lines < maxLines - 1) {
       context.fillText(line, x, y + lines * lineHeight)
-      line = character
+      line = unit
       lines += 1
     } else {
       line = testLine
     }
-    if (index === characters.length - 1) context.fillText(line, x, y + lines * lineHeight)
+    if (index === units.length - 1) context.fillText(line, x, y + lines * lineHeight)
   })
 }
 
@@ -276,7 +281,11 @@ const generateCard = () => {
   context.font = '22px system-ui, sans-serif'
   context.letterSpacing = '5px'
   context.fillText('ONE ARCANA · ASK. SHUFFLE. PICK ONE.', 104, 122)
-  context.fillText(displayDate.value, 824, 122)
+  context.textAlign = 'right'
+  context.fillText(displayDate.value, 976, 122)
+  context.font = '18px system-ui, sans-serif'
+  context.fillText(displayTime.value, 976, 154)
+  context.textAlign = 'start'
 
   const imageX = 104
   const imageY = 184
@@ -331,18 +340,46 @@ const generateCard = () => {
   wrapCanvasText(context, result.value.question || t.value.noQuestion, 104, 1014, 850, 52, 4)
   context.fillStyle = '#777970'
   context.font = '18px system-ui, sans-serif'
-  context.fillText(t.value.canvasFooter, 104, 1240)
+  context.fillText('onearcana.xergnik.com', 104, 1240)
+  context.textAlign = 'right'
+  context.fillText(`${t.value.canvasCreator} @Xer_Gnik`, 976, 1240)
+  context.textAlign = 'start'
 
   canvas.toBlob((blob) => {
     if (!blob) return
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.href = url
-    link.download = `tarot-${result.value.card.id}-${result.value.isReversed ? 'reversed' : 'upright'}.png`
-    link.click()
-    URL.revokeObjectURL(url)
-    showFeedback(t.value.generated)
+    if (sharePreview.value?.url) URL.revokeObjectURL(sharePreview.value.url)
+    const fileName = `tarot-${result.value.card.id}-${result.value.isReversed ? 'reversed' : 'upright'}.png`
+    sharePreview.value = { blob, fileName, url: URL.createObjectURL(blob) }
+    showFeedback(t.value.previewReady)
   }, 'image/png')
+}
+
+const closeSharePreview = () => {
+  if (sharePreview.value?.url) URL.revokeObjectURL(sharePreview.value.url)
+  sharePreview.value = null
+}
+
+const downloadGeneratedCard = async () => {
+  if (!sharePreview.value) return
+  const { blob, fileName, url } = sharePreview.value
+  const file = new File([blob], fileName, { type: 'image/png' })
+  const isMobile = window.matchMedia('(max-width: 780px)').matches
+
+  if (isMobile && navigator.share && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: 'ONE ARCANA' })
+      showFeedback(t.value.saved)
+      return
+    } catch (error) {
+      if (error?.name === 'AbortError') return
+    }
+  }
+
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  link.click()
+  showFeedback(t.value.downloaded)
 }
 
 const suitSymbol = (suit) => ({ wands: '│', cups: '◡', swords: '†', pentacles: '◇' }[suit] || '✦')
@@ -360,6 +397,7 @@ const resetReading = () => {
   activePickerCard.value = null
   pickerLift.value = 0
   pickerGesture.value = null
+  closeSharePreview()
   createShuffleCards()
 }
 
@@ -374,17 +412,17 @@ onBeforeUnmount(() => {
   window.clearTimeout(settleTimer)
   window.clearTimeout(stageTimer)
   window.clearTimeout(feedbackTimer)
+  closeSharePreview()
   vibrate(0)
 })
 </script>
 
 <template>
-  <main class="tarot-page">
+  <main class="tarot-page" :class="{ 'scroll-locked': stage !== 'reveal' }">
     <header class="tarot-header">
       <a href="/" :aria-label="t.back">ONE <span>ARCANA</span></a>
       <p>Ask. Shuffle. Pick one.</p>
       <div class="tarot-header-right">
-        <p>{{ t.disclaimer }}</p>
         <div class="tarot-languages" role="group" :aria-label="t.language">
           <button v-for="item in [{ id: 'en', label: 'EN' }, { id: 'ja', label: '日' }, { id: 'zh', label: '中' }]" :key="item.id" type="button" :class="{ active: language === item.id }" :aria-pressed="language === item.id" @click="language = item.id">{{ item.label }}</button>
         </div>
@@ -407,6 +445,11 @@ onBeforeUnmount(() => {
           </div>
         </form>
       </div>
+      <footer class="site-footer">
+        <p>{{ t.footerLocation }}</p>
+        <a href="https://github.com/RexKing624/ONEARCANA" target="_blank" rel="noreferrer">GitHub <span>ONEARCANA</span></a>
+        <a href="https://xergnik.com/" target="_blank" rel="noreferrer">@Xer_Gnik</a>
+      </footer>
     </section>
 
     <section v-else-if="stage === 'shuffle'" class="shuffle-view" aria-labelledby="shuffle-title">
@@ -506,6 +549,17 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
+    <div v-if="sharePreview" class="share-preview-backdrop" role="presentation" @click.self="closeSharePreview">
+      <section class="share-preview-dialog" role="dialog" aria-modal="true" :aria-label="t.imagePreview">
+        <div class="share-preview-toolbar">
+          <p>{{ t.imagePreview }}</p>
+          <button type="button" :aria-label="t.closePreview" @click="closeSharePreview">×</button>
+        </div>
+        <img :src="sharePreview.url" :alt="t.imagePreview" />
+        <button class="share-preview-download" type="button" @click="downloadGeneratedCard">{{ t.downloadImage }} <span>↓</span></button>
+      </section>
+    </div>
+
     <p class="feedback" :class="{ visible: feedback }" role="status">{{ feedback }}</p>
   </main>
 </template>
@@ -560,15 +614,16 @@ onBeforeUnmount(() => {
 .ask-view {
   min-height: calc(100svh - 88px);
   display: grid;
-  grid-template-rows: auto 1fr;
-  padding: 36px 0 7vh;
+  grid-template-rows: auto 1fr auto;
+  padding: 36px 0 0;
 }
 
 .ask-layout {
   display: grid;
   grid-template-columns: 1.1fr .9fr;
   gap: clamp(60px, 10vw, 160px);
-  align-items: end;
+  align-items: center;
+  padding-bottom: clamp(24px, 8vh, 96px);
 }
 
 .kicker { margin: 0 0 28px; color: var(--tarot-muted); font-size: 13px; }
@@ -613,6 +668,14 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 .form-footer button span, .shuffle-action button span { margin-left: 42px; color: var(--tarot-accent); }
+
+.site-footer { min-height: 74px; display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center; border-top: 1px solid var(--tarot-line); color: var(--tarot-muted); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.site-footer p { margin: 0; }
+.site-footer a { color: var(--tarot-muted); transition: color .2s ease; }
+.site-footer a:hover { color: var(--tarot-text); }
+.site-footer a:nth-child(2) { justify-self: center; }
+.site-footer a:last-child { justify-self: end; }
+.site-footer span { margin-left: 8px; color: #c6c5bd; }
 
 .shuffle-view { position: relative; min-height: calc(100svh - 88px); padding: 36px 0; }
 .stage-heading { position: relative; z-index: 40; pointer-events: none; }
@@ -709,6 +772,34 @@ onBeforeUnmount(() => {
 .feedback { position: fixed; z-index: 300; right: 28px; bottom: 28px; margin: 0; padding: 13px 18px; color: #171816; background: #e9e5da; font-size: 11px; opacity: 0; transform: translateY(8px); transition: opacity .25s ease, transform .25s ease; pointer-events: none; }
 .feedback.visible { opacity: 1; transform: translateY(0); }
 
+.share-preview-backdrop {
+  position: fixed;
+  z-index: 400;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(24px, 4vw, 56px);
+  background: rgba(8, 9, 8, .78);
+  backdrop-filter: blur(8px);
+}
+.share-preview-dialog {
+  width: min(620px, calc(100vw - 48px));
+  max-height: calc(100svh - 48px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--tarot-line);
+  background: #171815;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .58);
+}
+.share-preview-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.share-preview-toolbar p { margin: 0; color: var(--tarot-muted); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+.share-preview-toolbar button { width: 30px; height: 30px; padding: 0; border: 0; color: var(--tarot-muted); background: transparent; font-size: 22px; cursor: pointer; }
+.share-preview-dialog img { width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+.share-preview-download { justify-self: stretch; border: 1px solid var(--tarot-line); padding: 14px 18px; color: var(--tarot-text); background: transparent; cursor: pointer; }
+.share-preview-download span { float: right; color: var(--tarot-accent); }
+
 @keyframes chosen-card {
   from { opacity: .4; transform: translate(-50%, 20%) scale(.8) rotate(-4deg); }
   to { opacity: 1; transform: translate(-50%, -44%) scale(1.08) rotate(0); }
@@ -716,15 +807,19 @@ onBeforeUnmount(() => {
 
 @media (max-width: 780px) {
   .tarot-page { padding: 0 20px; }
+  .tarot-page.scroll-locked { position: fixed; inset: 0; width: 100%; height: 100svh; min-height: 0; overflow: hidden; overscroll-behavior: none; }
   .tarot-header { height: 72px; grid-template-columns: 1fr auto; }
   .tarot-header > p { display: none; }
   .tarot-header-right > p { display: none; }
-  .ask-view { min-height: calc(100svh - 72px); padding: 28px 0 32px; }
-  .ask-layout { grid-template-columns: 1fr; gap: 48px; align-content: end; }
+  .ask-view { min-height: calc(100svh - 72px); padding: 28px 0 0; }
+  .ask-layout { grid-template-columns: 1fr; gap: 48px; align-content: end; align-items: initial; padding-bottom: 0; }
   .ask-layout h1 { font-size: clamp(48px, 14vw, 70px); }
   .question-form textarea { font-size: 18px; }
   .form-footer { align-items: center; }
   .form-footer p { max-width: 190px; }
+  .site-footer { min-height: 58px; margin-top: 24px; gap: 8px; font-size: 8px; letter-spacing: .04em; }
+  .site-footer a:nth-child(2) span { display: none; }
+  .site-footer a:last-child { text-align: right; }
   .shuffle-view, .choose-view { min-height: calc(100svh - 72px); padding-top: 28px; }
   .stage-heading h1 { font-size: clamp(38px, 11vw, 58px); }
   .shuffle-area { top: 80px; }
@@ -741,6 +836,8 @@ onBeforeUnmount(() => {
   .result-copy h1 { font-size: clamp(46px, 13vw, 68px); }
   .meaning, .result-question { grid-template-columns: 1fr; gap: 12px; }
   .feedback { right: 20px; bottom: 20px; left: 20px; text-align: center; }
+  .share-preview-backdrop { padding: 14px; }
+  .share-preview-dialog { width: calc(100vw - 28px); max-height: calc(100svh - 28px); gap: 12px; padding: 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

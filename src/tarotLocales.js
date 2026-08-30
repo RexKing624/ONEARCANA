@@ -1,27 +1,27 @@
 export const tarotTranslations = {
   zh: {
-    language: '语言选择', back: '返回主页', subtitle: '单牌阵', disclaimer: '用于反思，而非预测。',
+    language: '语言选择', back: '返回主页', subtitle: '单牌阵',
     steps: ['提问', '洗牌', '选牌', '翻牌'],
     askKicker: '从此刻真正关心的事开始。', askTitle: '你想问什么？', question: '你的问题', optional: '可不填', questionPlaceholder: '未来一个月我的桃花如何？', privacy: '问题只会保留在本次抽牌与生成的图片中。', begin: '开始',
     shuffleTitle: '移动牌堆，直到你觉得可以了。', deckQuiet: '牌堆已经安静下来。', moveFreely: '按住牌堆，自由移动。', shuffleHint: '用鼠标或手指亲手洗牌', releaseHint: '松开后，牌会慢慢收拢', ready: '准备好后，开始抽牌。',
     chooseTitle: '选一张。', chooseHint: '没有正确的位置。点击，或把想要的牌向上推出。', chooseCard: '选择第 {number} 张牌', scroll: '← 拖动牌组 · 向上推牌 ↑',
-    upright: '正位', reversed: '逆位', meaning: '基础牌义', yourQuestion: '你的问题', copy: '复制给 AI', generate: '生成图片', again: '再抽一次', copied: '已复制，可以交给你的 AI Assistant', generated: '图片已生成并下载', noQuestion: '未填写特定问题', canvasQuestion: '你的问题', canvasFooter: '一次安静的自我反思，而不是未来预测。',
+    upright: '正位', reversed: '逆位', meaning: '基础牌义', yourQuestion: '你的问题', copy: '复制给 AI', generate: '生成图片', again: '再抽一次', copied: '已复制，可以交给你的 AI Assistant', previewReady: '分享图片已生成', downloaded: '图片已下载', saved: '已打开系统保存菜单', imagePreview: '图片预览', closePreview: '关闭预览', downloadImage: '保存图片', noQuestion: '未填写特定问题', canvasQuestion: '你的问题', canvasCreator: '制作人', footerLocation: '东京 · 日本',
   },
   ja: {
-    language: '言語を選択', back: 'ホームへ戻る', subtitle: 'ワンカード', disclaimer: '予言ではなく、内省のために。',
+    language: '言語を選択', back: 'ホームへ戻る', subtitle: 'ワンカード',
     steps: ['問い', 'シャッフル', '選ぶ', '開く'],
     askKicker: '今、心にあることから始めましょう。', askTitle: '何を問いかけますか？', question: 'あなたの質問', optional: '任意', questionPlaceholder: 'これから一か月の恋愛運は？', privacy: '質問は今回のリーディングと生成画像にだけ使用されます。', begin: '始める',
     shuffleTitle: 'しっくりくるまで、カードを動かしてください。', deckQuiet: 'カードが静まりました。', moveFreely: '押したまま、自由に動かしてください。', shuffleHint: 'マウスまたは指でシャッフル', releaseHint: '手を離すと、カードがゆっくり集まります', ready: '準備ができたら、引きましょう。',
     chooseTitle: '一枚選んで。', chooseHint: '正しい場所はありません。タップするか、選びたいカードを上へ押し出してください。', chooseCard: '{number}枚目のカードを選ぶ', scroll: '← カードを動かす · 上へ押す ↑',
-    upright: '正位置', reversed: '逆位置', meaning: '基本の意味', yourQuestion: 'あなたの質問', copy: 'AI用にコピー', generate: '画像を生成', again: 'もう一度引く', copied: 'コピーしました。AI Assistant に貼り付けられます', generated: '画像を生成してダウンロードしました', noQuestion: '特定の質問なし', canvasQuestion: 'あなたの質問', canvasFooter: '未来の断定ではなく、静かな内省のきっかけに。',
+    upright: '正位置', reversed: '逆位置', meaning: '基本の意味', yourQuestion: 'あなたの質問', copy: 'AI用にコピー', generate: '画像を生成', again: 'もう一度引く', copied: 'コピーしました。AI Assistant に貼り付けられます', previewReady: '共有画像を生成しました', downloaded: '画像をダウンロードしました', saved: 'システムの保存メニューを開きました', imagePreview: '画像プレビュー', closePreview: 'プレビューを閉じる', downloadImage: '画像を保存', noQuestion: '特定の質問なし', canvasQuestion: 'あなたの質問', canvasCreator: '制作', footerLocation: '東京 · 日本',
   },
   en: {
-    language: 'Choose language', back: 'Back to home', subtitle: 'A single card', disclaimer: 'For reflection, not prediction.',
+    language: 'Choose language', back: 'Back to home', subtitle: 'A single card',
     steps: ['Ask', 'Shuffle', 'Choose', 'Reveal'],
     askKicker: 'Begin with what is present.', askTitle: 'What would you like to ask?', question: 'Your question', optional: 'Optional', questionPlaceholder: 'What might shape my love life this month?', privacy: 'Your question stays within this reading and the image you generate.', begin: 'Begin',
     shuffleTitle: 'Move the deck until it feels right.', deckQuiet: 'The deck is quiet.', moveFreely: 'Press, hold, and move freely.', shuffleHint: 'Shuffle with your mouse or finger', releaseHint: 'Release and the cards will slowly gather', ready: "When you're ready, draw.",
     chooseTitle: 'Choose one.', chooseHint: 'There is no correct position. Tap, or push the card you want upward.', chooseCard: 'Choose card {number}', scroll: '← Drag the deck · Push up to pick ↑',
-    upright: 'Upright', reversed: 'Reversed', meaning: 'Basic meaning', yourQuestion: 'Your question', copy: 'Copy for AI', generate: 'Generate Card', again: 'Draw again', copied: 'Copied — ready for your AI Assistant', generated: 'Image generated and downloaded', noQuestion: 'No specific question', canvasQuestion: 'YOUR QUESTION', canvasFooter: 'A quiet prompt for reflection — not a prediction.',
+    upright: 'Upright', reversed: 'Reversed', meaning: 'Basic meaning', yourQuestion: 'Your question', copy: 'Copy for AI', generate: 'Generate Card', again: 'Draw again', copied: 'Copied — ready for your AI Assistant', previewReady: 'Share image ready', downloaded: 'Image downloaded', saved: 'System save menu opened', imagePreview: 'Image preview', closePreview: 'Close preview', downloadImage: 'Save image', noQuestion: 'No specific question', canvasQuestion: 'YOUR QUESTION', canvasCreator: 'CREATED BY', footerLocation: 'Tokyo · Japan',
   },
 }
 
