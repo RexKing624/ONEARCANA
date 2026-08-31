@@ -7,6 +7,8 @@ const savedLanguage = localStorage.getItem('site-language')
 const browserLanguage = (navigator.language || '').toLowerCase()
 const detectedLanguage = browserLanguage.startsWith('zh') ? 'zh' : browserLanguage.startsWith('ja') ? 'ja' : 'en'
 const language = ref(['zh', 'ja', 'en'].includes(savedLanguage) ? savedLanguage : detectedLanguage)
+const savedTheme = localStorage.getItem('one-arcana-theme')
+const theme = ref(savedTheme === 'light' ? 'light' : 'dark')
 const stage = ref('ask')
 const question = ref('')
 const result = ref(null)
@@ -32,6 +34,10 @@ let stageTimer
 let feedbackTimer
 let lastShuffleVibration = 0
 let lastPickerVibrationLevel = 0
+let audioContext
+let paperNoise
+let lastShuffleSound = 0
+let lastPickerHoverSound = 0
 
 const vibrate = (pattern) => {
   if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') navigator.vibrate(pattern)
@@ -47,6 +53,89 @@ const secureRandomInt = (max) => {
 }
 
 const secureBetween = (min, max) => min + (secureRandomInt(10000) / 9999) * (max - min)
+
+const ensureAudio = () => {
+  const AudioContext = window.AudioContext || window.webkitAudioContext
+  if (!AudioContext) return null
+  if (!audioContext) {
+    audioContext = new AudioContext()
+    const noiseLength = Math.floor(audioContext.sampleRate * .5)
+    paperNoise = audioContext.createBuffer(1, noiseLength, audioContext.sampleRate)
+    const noise = paperNoise.getChannelData(0)
+    const randomValues = new Uint8Array(noiseLength)
+    crypto.getRandomValues(randomValues)
+    for (let index = 0; index < noiseLength; index += 1) noise[index] = (randomValues[index] / 127.5) - 1
+  }
+  if (audioContext.state === 'suspended') audioContext.resume()
+  return audioContext
+}
+
+const playPaperSound = (intensity = .5, delay = 0) => {
+  const context = ensureAudio()
+  if (!context || !paperNoise) return
+  const duration = .04 + intensity * .055
+  const source = context.createBufferSource()
+  const filter = context.createBiquadFilter()
+  const gain = context.createGain()
+  const startAt = context.currentTime + delay
+  source.buffer = paperNoise
+  source.playbackRate.value = .82 + intensity * .32
+  filter.type = 'bandpass'
+  filter.frequency.value = 650 + intensity * 1100
+  filter.Q.value = .72
+  gain.gain.setValueAtTime(.0001, startAt)
+  gain.gain.exponentialRampToValueAtTime(.009 + intensity * .018, startAt + .012)
+  gain.gain.exponentialRampToValueAtTime(.0001, startAt + duration)
+  source.connect(filter).connect(gain).connect(context.destination)
+  const maxOffset = Math.max(0, paperNoise.duration - duration)
+  source.start(startAt, secureBetween(0, maxOffset), duration)
+}
+
+const playTone = (frequency, duration, volume, delay = 0) => {
+  const context = ensureAudio()
+  if (!context) return
+  const oscillator = context.createOscillator()
+  const gain = context.createGain()
+  const startAt = context.currentTime + delay
+  oscillator.type = 'sine'
+  oscillator.frequency.setValueAtTime(frequency, startAt)
+  oscillator.frequency.exponentialRampToValueAtTime(frequency * .82, startAt + duration)
+  gain.gain.setValueAtTime(.0001, startAt)
+  gain.gain.exponentialRampToValueAtTime(volume, startAt + .012)
+  gain.gain.exponentialRampToValueAtTime(.0001, startAt + duration)
+  oscillator.connect(gain).connect(context.destination)
+  oscillator.start(startAt)
+  oscillator.stop(startAt + duration + .02)
+}
+
+const playDeckSpread = () => {
+  playPaperSound(.55)
+  playPaperSound(.35, .075)
+}
+
+const playCardPick = () => {
+  const context = ensureAudio()
+  if (!context) return
+  const startAt = context.currentTime
+  const body = context.createOscillator()
+  const bodyGain = context.createGain()
+  body.type = 'triangle'
+  body.frequency.setValueAtTime(245, startAt)
+  body.frequency.exponentialRampToValueAtTime(112, startAt + .13)
+  bodyGain.gain.setValueAtTime(.0001, startAt)
+  bodyGain.gain.exponentialRampToValueAtTime(.032, startAt + .006)
+  bodyGain.gain.exponentialRampToValueAtTime(.0001, startAt + .15)
+  body.connect(bodyGain).connect(context.destination)
+  body.start(startAt)
+  body.stop(startAt + .17)
+  playTone(680, .1, .012, .025)
+}
+
+const playCardReveal = () => {
+  playPaperSound(.72)
+  playTone(392, .34, .018, .06)
+  playTone(523.25, .42, .012, .14)
+}
 
 const createShuffleCards = () => {
   shuffleCards.value = Array.from({ length: 24 }, (_, index) => ({
@@ -75,9 +164,20 @@ watch(language, (value) => {
   document.documentElement.lang = value === 'zh' ? 'zh-CN' : value
 }, { immediate: true })
 
+watch(theme, (value) => {
+  localStorage.setItem('one-arcana-theme', value)
+  document.documentElement.dataset.theme = value
+}, { immediate: true })
+
 const startShuffle = () => {
   createShuffleCards()
   stage.value = 'shuffle'
+}
+
+const handleQuestionKeydown = (event) => {
+  if (event.key !== 'Enter' || event.shiftKey || event.isComposing || window.matchMedia('(max-width: 780px)').matches) return
+  event.preventDefault()
+  startShuffle()
 }
 
 const beginPointer = (event) => {
@@ -88,6 +188,7 @@ const beginPointer = (event) => {
   event.currentTarget.setPointerCapture?.(event.pointerId)
   window.clearTimeout(settleTimer)
   vibrate(7)
+  playPaperSound(.22)
 }
 
 const movePointer = (event) => {
@@ -97,9 +198,14 @@ const movePointer = (event) => {
   if (Math.abs(dx) + Math.abs(dy) < 1) return
   hasShuffled.value = true
   const now = performance.now()
+  const movement = Math.abs(dx) + Math.abs(dy)
   if (Math.abs(dx) + Math.abs(dy) > 7 && now - lastShuffleVibration > 90) {
     vibrate(6)
     lastShuffleVibration = now
+  }
+  if (movement > 3 && now - lastShuffleSound > 72) {
+    playPaperSound(Math.min(1, movement / 28))
+    lastShuffleSound = now
   }
   lastPoint.value = { x: event.clientX, y: event.clientY }
   shuffleCards.value.forEach((card, index) => {
@@ -130,6 +236,7 @@ const endPointer = (event) => {
 const openDeck = async () => {
   if (!deckIsSettled.value) return
   vibrate(10)
+  playDeckSpread()
   stage.value = 'choose'
   await nextTick()
   if (pickerWindow.value) pickerWindow.value.scrollLeft = (pickerWindow.value.scrollWidth - pickerWindow.value.clientWidth) / 2
@@ -194,9 +301,18 @@ const handleCardClick = (event, index) => {
   chooseCard(index)
 }
 
+const playPickerHover = (event) => {
+  if (event.pointerType !== 'mouse' || selectedBack.value !== null || pickerGesture.value) return
+  const now = performance.now()
+  if (now - lastPickerHoverSound < 48) return
+  playPaperSound(.28)
+  lastPickerHoverSound = now
+}
+
 const chooseCard = (index) => {
   if (selectedBack.value !== null) return
   vibrate([22, 34, 30])
+  playCardPick()
   selectedBack.value = index
   const card = tarotCards[secureRandomInt(tarotCards.length)]
   const isReversed = secureRandomInt(2) === 1
@@ -213,6 +329,7 @@ const chooseCard = (index) => {
     stageTimer = window.setTimeout(() => {
       isRevealed.value = true
       vibrate(12)
+      playCardReveal()
     }, 120)
   }, 680)
 }
@@ -277,15 +394,31 @@ const generateCard = () => {
   context.lineWidth = 2
   context.strokeRect(58, 58, 964, 1234)
 
+  const brandText = 'ONE ARCANA'
+  const brandSubtitle = 'Ask. Shuffle. Pick one.'
+  context.font = '600 34px system-ui, sans-serif'
+  context.letterSpacing = '3px'
+  context.fillStyle = '#f1efe8'
+  context.fillText('ONE', 104, 120)
+  const arcanaX = 104 + context.measureText('ONE ').width
+  context.fillStyle = '#b9a77d'
+  context.fillText('ARCANA', arcanaX, 120)
+  const brandWidth = context.measureText(brandText).width
+  context.font = '16px system-ui, sans-serif'
+  context.letterSpacing = '0px'
+  const subtitleWidth = context.measureText(brandSubtitle).width
+  const subtitleSpacing = Math.max(0, (brandWidth - subtitleWidth) / (brandSubtitle.length - 1))
+  context.letterSpacing = `${subtitleSpacing}px`
   context.fillStyle = '#9d9f96'
-  context.font = '22px system-ui, sans-serif'
-  context.letterSpacing = '5px'
-  context.fillText('ONE ARCANA · ASK. SHUFFLE. PICK ONE.', 104, 122)
+  context.fillText(brandSubtitle, 104, 156)
+  context.letterSpacing = '2px'
   context.textAlign = 'right'
-  context.fillText(displayDate.value, 976, 122)
+  context.fillStyle = '#9d9f96'
   context.font = '18px system-ui, sans-serif'
+  context.fillText(displayDate.value, 976, 122)
   context.fillText(displayTime.value, 976, 154)
   context.textAlign = 'start'
+  context.letterSpacing = '0px'
 
   const imageX = 104
   const imageY = 184
@@ -413,12 +546,14 @@ onBeforeUnmount(() => {
   window.clearTimeout(stageTimer)
   window.clearTimeout(feedbackTimer)
   closeSharePreview()
+  audioContext?.close()
+  audioContext = null
   vibrate(0)
 })
 </script>
 
 <template>
-  <main class="tarot-page" :class="{ 'scroll-locked': stage !== 'reveal' }">
+  <main class="tarot-page" :class="{ 'scroll-locked': stage !== 'reveal', light: theme === 'light' }">
     <header class="tarot-header">
       <a href="/" :aria-label="t.back">ONE <span>ARCANA</span></a>
       <p>Ask. Shuffle. Pick one.</p>
@@ -426,6 +561,9 @@ onBeforeUnmount(() => {
         <div class="tarot-languages" role="group" :aria-label="t.language">
           <button v-for="item in [{ id: 'en', label: 'EN' }, { id: 'ja', label: '日' }, { id: 'zh', label: '中' }]" :key="item.id" type="button" :class="{ active: language === item.id }" :aria-pressed="language === item.id" @click="language = item.id">{{ item.label }}</button>
         </div>
+        <button class="theme-switcher" type="button" :aria-label="t.theme" @click="theme = theme === 'light' ? 'dark' : 'light'">
+          <span class="theme-track" aria-hidden="true"><span :class="{ dark: theme === 'dark' }"></span></span>
+        </button>
       </div>
     </header>
 
@@ -438,7 +576,7 @@ onBeforeUnmount(() => {
         </div>
         <form class="question-form" @submit.prevent="startShuffle">
           <label for="tarot-question">{{ t.question }} <span>{{ t.optional }}</span></label>
-          <textarea id="tarot-question" v-model="question" rows="4" maxlength="240" :placeholder="t.questionPlaceholder"></textarea>
+          <textarea id="tarot-question" v-model="question" rows="4" maxlength="240" :placeholder="t.questionPlaceholder" @keydown="handleQuestionKeydown"></textarea>
           <div class="form-footer">
             <p>{{ t.privacy }}</p>
             <button type="submit">{{ t.begin }} <span>→</span></button>
@@ -497,6 +635,7 @@ onBeforeUnmount(() => {
             :style="{ '--offset': index - 38.5, '--gesture-lift': activePickerCard === index ? pickerLift : 0, zIndex: activePickerCard === index ? 110 : index }"
             :aria-label="t.chooseCard.replace('{number}', index + 1)"
             @pointerdown="beginPickGesture($event, index)"
+            @pointerenter="playPickerHover"
             @pointermove="movePickGesture"
             @pointerup="finishPickGesture($event, index)"
             @pointercancel="finishPickGesture($event, index, true)"
@@ -576,6 +715,15 @@ onBeforeUnmount(() => {
   padding: 0 4vw;
   color: var(--tarot-text);
   background: var(--tarot-bg);
+  transition: color .35s ease, background .35s ease;
+}
+
+.tarot-page.light {
+  --tarot-bg: #efede6;
+  --tarot-text: #171816;
+  --tarot-muted: #686a63;
+  --tarot-line: rgba(23, 24, 22, .17);
+  --tarot-accent: #8b7548;
 }
 
 .tarot-header {
@@ -598,6 +746,10 @@ onBeforeUnmount(() => {
 .tarot-languages button { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; color: #74766e; background: transparent; font-size: 9px; cursor: pointer; transition: color .2s ease, background .2s ease; }
 .tarot-languages button:hover { color: var(--tarot-text); }
 .tarot-languages button.active { color: var(--tarot-bg); background: var(--tarot-text); }
+.theme-switcher { padding: 0; border: 0; background: transparent; cursor: pointer; }
+.theme-track { position: relative; display: block; width: 42px; height: 24px; border: 1px solid var(--tarot-line); border-radius: 20px; }
+.theme-track > span { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--tarot-accent); transition: transform .25s ease, background .25s ease; }
+.theme-track > span.dark { background: var(--tarot-text); transform: translateX(18px); }
 
 .step-label {
   display: flex;
@@ -660,14 +812,22 @@ onBeforeUnmount(() => {
 .form-footer { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; margin-top: 22px; }
 .form-footer p { max-width: 250px; margin: 0; color: var(--tarot-muted); font-size: 11px; line-height: 1.6; }
 .form-footer button, .shuffle-action button {
+  min-width: 112px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  flex: 0 0 auto;
   border: 0;
   border-bottom: 1px solid var(--tarot-text);
   padding: 6px 0;
   color: var(--tarot-text);
   background: none;
+  line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
 }
-.form-footer button span, .shuffle-action button span { margin-left: 42px; color: var(--tarot-accent); }
+.form-footer button span, .shuffle-action button span { display: inline-flex; align-items: center; margin-left: 0; color: var(--tarot-accent); line-height: 1; transform: translateY(-1px); }
 
 .site-footer { min-height: 74px; display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center; border-top: 1px solid var(--tarot-line); color: var(--tarot-muted); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
 .site-footer p { margin: 0; }
@@ -800,6 +960,14 @@ onBeforeUnmount(() => {
 .share-preview-download { justify-self: stretch; border: 1px solid var(--tarot-line); padding: 14px 18px; color: var(--tarot-text); background: transparent; cursor: pointer; }
 .share-preview-download span { float: right; color: var(--tarot-accent); }
 
+.tarot-page.light .question-form textarea::placeholder { color: #98998f; }
+.tarot-page.light .keywords, .tarot-page.light .meaning p:last-child { color: #4f514b; }
+.tarot-page.light .shuffle-area { filter: drop-shadow(0 18px 24px rgba(104, 106, 99, .2)) drop-shadow(0 -4px 12px rgba(255, 255, 255, .48)); }
+.tarot-page.light .shuffle-card, .tarot-page.light .shuffle-area.active .shuffle-card { box-shadow: none; }
+.tarot-page.light .share-preview-backdrop { background: rgba(239, 237, 230, .78); }
+.tarot-page.light .share-preview-dialog { background: #f5f2ea; box-shadow: 0 28px 90px rgba(23, 24, 22, .16); }
+.tarot-page.light .feedback { color: #efede6; background: #171816; }
+
 @keyframes chosen-card {
   from { opacity: .4; transform: translate(-50%, 20%) scale(.8) rotate(-4deg); }
   to { opacity: 1; transform: translate(-50%, -44%) scale(1.08) rotate(0); }
@@ -809,8 +977,10 @@ onBeforeUnmount(() => {
   .tarot-page { padding: 0 20px; }
   .tarot-page.scroll-locked { position: fixed; inset: 0; width: 100%; height: 100svh; min-height: 0; overflow: hidden; overscroll-behavior: none; }
   .tarot-header { height: 72px; grid-template-columns: 1fr auto; }
+  .tarot-header > a { font-size: 13px; letter-spacing: .1em; }
   .tarot-header > p { display: none; }
   .tarot-header-right > p { display: none; }
+  .tarot-header-right { gap: 12px; }
   .ask-view { min-height: calc(100svh - 72px); padding: 28px 0 0; }
   .ask-layout { grid-template-columns: 1fr; gap: 48px; align-content: end; align-items: initial; padding-bottom: 0; }
   .ask-layout h1 { font-size: clamp(48px, 14vw, 70px); }
