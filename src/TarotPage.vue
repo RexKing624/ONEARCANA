@@ -475,7 +475,7 @@ const generateCard = () => {
   context.font = '18px system-ui, sans-serif'
   context.fillText('onearcana.xergnik.com', 104, 1240)
   context.textAlign = 'right'
-  context.fillText('@Xer_Gnik', 976, 1240)
+  context.fillText('@XER_GNIK', 976, 1240)
   context.textAlign = 'start'
 
   canvas.toBlob((blob) => {
@@ -586,7 +586,7 @@ onBeforeUnmount(() => {
       <footer class="site-footer">
         <p>{{ t.footerLocation }}</p>
         <a href="https://github.com/RexKing624/ONEARCANA" target="_blank" rel="noreferrer">GitHub <span>ONEARCANA</span></a>
-        <a href="https://xergnik.com/" target="_blank" rel="noreferrer">@Xer_Gnik</a>
+        <a href="https://xergnik.com/" target="_blank" rel="noreferrer">© 2026 XER_GNIK</a>
       </footer>
     </section>
 

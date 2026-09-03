@@ -138,4 +138,4 @@ The 78 Rider–Waite–Smith card scans in `public/assets/tarot/cards` are publi
 ## Links
 
 - Website: [onearcana.xergnik.com](https://onearcana.xergnik.com/)
-- Creator: [@Xer_Gnik](https://xergnik.com/)
+- Creator: [© 2026 XER_GNIK](https://xergnik.com/)
