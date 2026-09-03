@@ -155,9 +155,6 @@ const currentMeaning = computed(() => cardText.value?.meaning || '')
 const localCardName = computed(() => cardText.value?.localName || '')
 const orientationEn = computed(() => result.value?.isReversed ? 'Reversed' : 'Upright')
 const orientationLocal = computed(() => result.value?.isReversed ? t.value.reversed : t.value.upright)
-const dateLocale = computed(() => ({ zh: 'zh-CN', ja: 'ja-JP', en: 'en-CA' }[language.value]))
-const displayDate = computed(() => result.value?.date || new Intl.DateTimeFormat(dateLocale.value, { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()))
-const displayTime = computed(() => result.value?.time || new Intl.DateTimeFormat(dateLocale.value, { hour: '2-digit', minute: '2-digit' }).format(new Date()))
 
 watch(language, (value) => {
   localStorage.setItem('site-language', value)
@@ -316,13 +313,10 @@ const chooseCard = (index) => {
   selectedBack.value = index
   const card = tarotCards[secureRandomInt(tarotCards.length)]
   const isReversed = secureRandomInt(2) === 1
-  const drawnAt = new Date()
   result.value = {
     card,
     isReversed,
     question: question.value.trim(),
-    date: new Intl.DateTimeFormat(dateLocale.value, { year: 'numeric', month: '2-digit', day: '2-digit' }).format(drawnAt),
-    time: new Intl.DateTimeFormat(dateLocale.value, { hour: '2-digit', minute: '2-digit' }).format(drawnAt),
   }
   stageTimer = window.setTimeout(() => {
     stage.value = 'reveal'
@@ -411,13 +405,6 @@ const generateCard = () => {
   context.letterSpacing = `${subtitleSpacing}px`
   context.fillStyle = '#9d9f96'
   context.fillText(brandSubtitle, 104, 156)
-  context.letterSpacing = '2px'
-  context.textAlign = 'right'
-  context.fillStyle = '#9d9f96'
-  context.font = '18px system-ui, sans-serif'
-  context.fillText(displayDate.value, 976, 122)
-  context.fillText(displayTime.value, 976, 154)
-  context.textAlign = 'start'
   context.letterSpacing = '0px'
 
   const imageX = 104
